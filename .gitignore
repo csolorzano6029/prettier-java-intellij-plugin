@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+gradlew
+gradlew.bat
+gradle/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
