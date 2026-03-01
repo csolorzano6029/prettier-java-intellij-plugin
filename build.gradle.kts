@@ -20,6 +20,7 @@ dependencies {
         intellijIdeaCommunity(providers.gradleProperty("platformVersion").get())
         bundledPlugin("com.intellij.java")
     }
+    implementation("com.caoccao.javet:javet:3.1.3")
 }
 
 // ============================================================

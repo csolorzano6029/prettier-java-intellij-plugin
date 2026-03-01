@@ -22,7 +22,6 @@ class PrettierJavaSettingsPanel {
     // Controls
     private val enabledCheckBox     = JBCheckBox("Enable Prettier Java formatter")
     private val formatOnSaveCheckBox = JBCheckBox("Format on Save (runs Prettier every time you save a .java file)")
-    private val nodePathField       = JBTextField()
     private val printWidthSpinner   = JSpinner(SpinnerNumberModel(80, 1, 500, 1))
     private val tabWidthSpinner     = JSpinner(SpinnerNumberModel(4, 1, 16, 1))
     private val useTabsCheckBox     = JBCheckBox("Use Tabs instead of spaces")
@@ -60,7 +59,6 @@ class PrettierJavaSettingsPanel {
 
         addFullRow(enabledCheckBox)
         addFullRow(formatOnSaveCheckBox)
-        addRow("Node.js executable path:", nodePathField)
         addRow("Print Width:", printWidthSpinner)
         addRow("Tab Width:", tabWidthSpinner)
         addFullRow(useTabsCheckBox)
@@ -78,7 +76,6 @@ class PrettierJavaSettingsPanel {
     fun apply(settings: PrettierJavaSettings.State) {
         settings.enabled       = enabledCheckBox.isSelected
         settings.formatOnSave  = formatOnSaveCheckBox.isSelected
-        settings.nodePath      = nodePathField.text.trim().ifBlank { "node" }
         settings.printWidth    = printWidthSpinner.value as Int
         settings.tabWidth      = tabWidthSpinner.value as Int
         settings.useTabs       = useTabsCheckBox.isSelected
@@ -91,7 +88,6 @@ class PrettierJavaSettingsPanel {
     fun reset(settings: PrettierJavaSettings.State) {
         enabledCheckBox.isSelected      = settings.enabled
         formatOnSaveCheckBox.isSelected = settings.formatOnSave
-        nodePathField.text              = settings.nodePath
         printWidthSpinner.value         = settings.printWidth
         tabWidthSpinner.value           = settings.tabWidth
         useTabsCheckBox.isSelected      = settings.useTabs
@@ -104,7 +100,6 @@ class PrettierJavaSettingsPanel {
     fun isModified(settings: PrettierJavaSettings.State): Boolean =
         enabledCheckBox.isSelected      != settings.enabled ||
         formatOnSaveCheckBox.isSelected != settings.formatOnSave ||
-        nodePathField.text.trim()       != settings.nodePath ||
         printWidthSpinner.value as Int  != settings.printWidth ||
         tabWidthSpinner.value as Int    != settings.tabWidth ||
         useTabsCheckBox.isSelected      != settings.useTabs ||

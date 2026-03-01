@@ -1,0 +1,48 @@
+<idea-plugin>
+    <id>com.prettierjavaplugin</id>
+    <name>Prettier Java</name>
+    <version>1.0.0</version>
+    <vendor>Prettier Java Plugin</vendor>
+
+    <description><![CDATA[
+        Format Java files using <b>Prettier</b> with <code>prettier-plugin-java</code>.<br><br>
+        <ul>
+            <li>Integrates with <b>Ctrl+Alt+L</b> (Reformat Code)</li>
+            <li><b>Format on Save</b> via Ctrl+S (enable in Settings → Tools → Prettier Java)</li>
+            <li>All Prettier options configurable in <b>Settings → Tools → Prettier Java</b></li>
+        </ul>
+        <br>Requires <b>Node.js</b> installed on the system (configurable path).
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Formatter: Ctrl+Alt+L -->
+        <formattingService
+                implementation="com.prettierjavaplugin.PrettierJavaFormattingService"/>
+
+        <!-- Settings: Settings → Tools → Prettier Java -->
+        <applicationConfigurable
+                parentId="tools"
+                instance="com.prettierjavaplugin.PrettierJavaSettingsConfigurable"
+                id="com.prettierjavaplugin.settings"
+                displayName="Prettier Java"/>
+
+        <!-- Persistent settings -->
+        <applicationService
+                serviceImplementation="com.prettierjavaplugin.PrettierJavaSettings"/>
+    </extensions>
+
+    <actions>
+        <!--
+            overrides="true" completely replaces IntelliJ's built-in SaveAll (Ctrl+S).
+            No shortcut conflicts. Our action handles all save cases:
+            - Java file + Format on Save ON → format then save
+            - Anything else → save normally
+        -->
+        <action id="SaveAll"
+                class="com.prettierjavaplugin.PrettierJavaFormatAndSaveAction"
+                overrides="true"/>
+    </actions>
+</idea-plugin>

@@ -14,7 +14,6 @@ import com.intellij.openapi.components.service
 class PrettierJavaSettings : PersistentStateComponent<PrettierJavaSettings.State> {
 
     data class State(
-        var nodePath: String = "node",
         var printWidth: Int = 80,
         var tabWidth: Int = 2,
         var useTabs: Boolean = false,

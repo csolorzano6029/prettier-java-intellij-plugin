@@ -1,23 +1,22 @@
 package com.prettierjavaplugin
 
+import com.caoccao.javet.interop.V8Host
+import com.caoccao.javet.interop.V8Runtime
+import com.caoccao.javet.interop.options.NodeRuntimeOptions
 import com.intellij.formatting.service.AsyncDocumentFormattingService
 import com.intellij.formatting.service.AsyncFormattingRequest
 import com.intellij.formatting.service.FormattingService
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.psi.PsiFile
 import java.io.File
-import java.io.IOException
 import java.nio.file.Files
 import java.util.EnumSet
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 
 /**
  * Core formatting service that integrates Prettier with IntelliJ's Reformat Code (Ctrl+Alt+L).
  *
- * On first use, extracts format.js and node_modules.zip from the plugin JAR to a temp directory.
- * Then calls Node.js as a subprocess passing Java code via stdin and reading formatted code from stdout.
+ * Uses Javet to embed an in-memory V8 Node.js runtime, bypassing the need for an external node process.
  */
 class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
 
@@ -38,7 +37,6 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
     override fun createFormattingTask(request: AsyncFormattingRequest): FormattingTask? {
         val settings = PrettierJavaSettings.getInstance().state
         val code = request.documentText
-        // Get the file path so format.js can call prettier.resolveConfig() for .prettierrc
         val filePath = try {
             request.context.virtualFile?.path ?: ""
         } catch (_: Exception) { "" }
@@ -78,68 +76,115 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
         @Volatile
         private var tempDir: File? = null
 
+        private val v8Executor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+            // Use a larger stack size (4MB) for the native V8 engine
+            Thread(null, r, "PrettierJava-V8-Worker", 4 * 1024 * 1024).apply { isDaemon = true }
+        }
+
         /**
-         * Runs Prettier on [code] using the given [settings].
-         * Reads stdout/stderr concurrently to prevent deadlocks and capture real error messages.
+         * Runs Prettier on [code] using the given [settings] inside a transient Javet V8 engine.
+         * Executes on a dedicated background thread to prevent native thread affinity crashes and concurrency issues.
          */
         fun runPrettier(code: String, settings: PrettierJavaSettings.State, filePath: String = ""): String? {
-            val prettierDir = extractPrettierResources()
-            val formatScript = File(prettierDir, "format.js")
+            log.info("Prettier Java: Scheduling formatting for '$filePath'")
+            
+            return try {
+                // Remove the .get() timeout to avoid unsafe native thread interruption
+                v8Executor.submit(java.util.concurrent.Callable {
+                    runPrettierInternal(code, settings, filePath)
+                }).get() 
+            } catch (t: Throwable) {
+                log.error("Prettier Java: Error during formatting task", t)
+                null
+            }
+        }
+
+        private fun runPrettierInternal(code: String, settings: PrettierJavaSettings.State, filePath: String): String? {
+            log.info("Prettier Java: Starting runPrettierInternal on ${Thread.currentThread().name}")
+            System.err.println("Prettier Java [NATIVE TRACE]: Starting runPrettierInternal")
+            
             val optionsJson = buildOptionsJson(settings, filePath)
+            val prettierDir = extractPrettierResources()
+            val formatScript = File(prettierDir, "format.js").absolutePath.replace("\\", "/")
 
-            // New protocol: first line of stdin = JSON options, rest = Java code
-            // This avoids Windows CLI argument quoting issues with JSON double-quotes
-            val input = (optionsJson + "\n" + code).toByteArray(Charsets.UTF_8)
-
-            val process = ProcessBuilder(settings.nodePath, formatScript.absolutePath)
-                .directory(prettierDir)
-                .redirectErrorStream(false)
-                .start()
-
-            // Start reading stdout/stderr concurrently BEFORE writing stdin (prevents deadlock)
-            val stdoutFuture = CompletableFuture.supplyAsync {
-                process.inputStream.readBytes().toString(Charsets.UTF_8)
-            }
-            val stderrFuture = CompletableFuture.supplyAsync {
-                process.errorStream.readBytes().toString(Charsets.UTF_8)
-            }
-
-            // Write options + code to stdin
+            log.info("Prettier Java: Creating V8 Runtime (Node mode)...")
+            System.err.println("Prettier Java [NATIVE TRACE]: Creating V8 Runtime")
+            
+            // Basic runtime creation
+            val runtime: com.caoccao.javet.interop.V8Runtime = V8Host.getNodeInstance().createV8Runtime()
+            var result: String? = null
+            
             try {
-                process.outputStream.use { it.write(input) }
-            } catch (_: IOException) {
-                // Node exited early — stderr will explain why
+                log.info("Prettier Java: Initializing format.js...")
+                System.err.println("Prettier Java [NATIVE TRACE]: Initializing format.js")
+                
+                val initScript = """
+                    const formatModule = require('$formatScript');
+                    globalThis.formatCode = formatModule.formatCode;
+                """.trimIndent()
+                
+                runtime.getExecutor(initScript).executeVoid()
+
+                log.info("Prettier Java: Calling formatCode JS function...")
+                System.err.println("Prettier Java [NATIVE TRACE]: Calling formatCode")
+                val globalObj = runtime.getGlobalObject()
+                
+                // Get the function as a V8Value and cast it
+                val formatFn = globalObj.get<com.caoccao.javet.values.reference.V8ValueFunction>("formatCode")
+                
+                try {
+                    val promise = formatFn.call<com.caoccao.javet.values.reference.V8ValuePromise>(null, code as Any, optionsJson as Any)
+                    try {
+                        log.info("Prettier Java: Awaiting JS Promise...")
+                        System.err.println("Prettier Java [NATIVE TRACE]: Awaiting JS Promise")
+                        runtime.await() // Process Node.js Event Loop
+                        
+                        System.err.println("Prettier Java [NATIVE TRACE]: Promise resolved")
+                        if (promise.isRejected) {
+                            val errorValue = promise.getResult<com.caoccao.javet.values.V8Value>()
+                            val error = errorValue.toString()
+                            errorValue.close()
+                            log.warn("Prettier Java: JS Promise REJECTED: $error")
+                        } else {
+                            val v8Result = promise.getResult<com.caoccao.javet.values.V8Value>()
+                            val formatted = v8Result.toString()
+                            v8Result.close()
+                            
+                            log.info("Prettier Java: Format successful, result length: ${formatted.length}")
+                            if (formatted.isNotBlank()) {
+                                result = formatted
+                            }
+                        }
+                    } finally {
+                        promise.close()
+                    }
+                } finally {
+                    formatFn.close()
+                    globalObj.close()
+                }
+            } catch (t: Throwable) {
+                log.error("Prettier Java: V8 Internal Error", t)
+                System.err.println("Prettier Java [NATIVE TRACE]: ERROR: ${t.message}")
+                t.printStackTrace()
+            } finally {
+                log.info("Prettier Java: Closing V8 Runtime...")
+                System.err.println("Prettier Java [NATIVE TRACE]: Closing V8 Runtime")
+                try {
+                    runtime.close()
+                    log.info("Prettier Java: Runtime closed successfully.")
+                } catch (e: Exception) {
+                    log.error("Prettier Java: Error closing runtime", e)
+                }
             }
-
-            val exited = process.waitFor(60, TimeUnit.SECONDS)
-            if (!exited) {
-                process.destroyForcibly()
-                throw RuntimeException("Prettier timed out after 60 seconds")
-            }
-
-            val stdout = stdoutFuture.get(5, TimeUnit.SECONDS)
-            val stderr = stderrFuture.get(5, TimeUnit.SECONDS)
-
-            val exitCode = process.exitValue()
-            if (exitCode != 0) {
-                throw RuntimeException(
-                    if (stderr.isNotBlank()) stderr.trim()
-                    else "Prettier exited with code $exitCode"
-                )
-            }
-
-            return stdout.ifBlank { null }
+            
+            return result
         }
 
         private fun buildOptionsJson(settings: PrettierJavaSettings.State, filePath: String = ""): String {
-            // filePath is passed so format.js can call prettier.resolveConfig() for .prettierrc
             val escapedPath = filePath.replace("\\", "/")
             return """{"filePath":"$escapedPath","printWidth":${settings.printWidth},"tabWidth":${settings.tabWidth},"useTabs":${settings.useTabs},"trailingComma":"${settings.trailingComma}","semi":${settings.semi},"singleQuote":${settings.singleQuote}}"""
         }
 
-        /**
-         * Extracts plugin resources (format.js + node_modules.zip) to a temp dir on first use.
-         */
         @Synchronized
         fun extractPrettierResources(): File {
             val existing = tempDir
@@ -164,6 +209,7 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
             val nodeModulesDir = File(dir, "node_modules")
             nodeModulesDir.mkdirs()
 
+            var extractedCount = 0
             ZipInputStream(nodeModulesZipStream).use { zis ->
                 var entry = zis.nextEntry
                 while (entry != null) {
@@ -172,11 +218,25 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
                         destFile.mkdirs()
                     } else {
                         destFile.parentFile?.mkdirs()
-                        destFile.writeBytes(zis.readBytes())
+                        java.io.FileOutputStream(destFile).use { fos ->
+                            zis.copyTo(fos)
+                        }
+                        extractedCount++
                     }
                     zis.closeEntry()
                     entry = zis.nextEntry
                 }
+            }
+
+            val prettierIndex = File(nodeModulesDir, "prettier/index.js")
+            val prettierExists = prettierIndex.exists()
+            
+            val msg = "Prettier Java [NATIVE TRACE]: [V5] Resources extracted. Total files: $extractedCount. Prettier index exists: $prettierExists"
+            log.info(msg)
+            System.err.println(msg)
+            
+            if (!prettierExists) {
+                System.err.println("Prettier Java [NATIVE TRACE]: CRITICAL - prettier index NOT FOUND at ${prettierIndex.absolutePath}")
             }
 
             log.info("Prettier Java: Resources extracted to ${dir.absolutePath}")
