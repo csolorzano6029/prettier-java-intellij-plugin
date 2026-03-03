@@ -40,6 +40,9 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
         val filePath = try {
             request.context.virtualFile?.path ?: ""
         } catch (_: Exception) { "" }
+        val projectBasePath = try {
+            request.context.project.basePath
+        } catch (_: Exception) { null }
 
         return object : FormattingTask {
             @Volatile
@@ -48,7 +51,7 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
             override fun run() {
                 if (cancelled) return
                 try {
-                    val result = runPrettier(code, settings, filePath)
+                    val result = runPrettier(code, settings, filePath, projectBasePath)
                     if (result != null) {
                         request.onTextReady(result)
                     } else {
@@ -85,13 +88,13 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
          * Runs Prettier on [code] using the given [settings] inside a transient Javet V8 engine.
          * Executes on a dedicated background thread to prevent native thread affinity crashes and concurrency issues.
          */
-        fun runPrettier(code: String, settings: PrettierJavaSettings.State, filePath: String = ""): String? {
+        fun runPrettier(code: String, settings: PrettierJavaSettings.State, filePath: String = "", projectBasePath: String? = null): String? {
             log.info("Prettier Java: Scheduling formatting for '$filePath'")
             
             return try {
                 // Remove the .get() timeout to avoid unsafe native thread interruption
                 v8Executor.submit(java.util.concurrent.Callable {
-                    runPrettierInternal(code, settings, filePath)
+                    runPrettierInternal(code, settings, filePath, projectBasePath)
                 }).get() 
             } catch (t: Throwable) {
                 log.error("Prettier Java: Error during formatting task", t)
@@ -99,9 +102,35 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
             }
         }
 
-        private fun runPrettierInternal(code: String, settings: PrettierJavaSettings.State, filePath: String): String? {
+        private fun runPrettierInternal(code: String, settings: PrettierJavaSettings.State, filePath: String, projectBasePath: String?): String? {
             log.info("Prettier Java: Starting runPrettierInternal on ${Thread.currentThread().name}")
             System.err.println("Prettier Java [NATIVE TRACE]: Starting runPrettierInternal")
+            
+            // --- Custom Profile Auto-Generation Logic --- //
+            if (settings.globalProfile == "Custom" && projectBasePath != null) {
+                try {
+                    val rootDir = File(projectBasePath)
+                    if (rootDir.exists() && rootDir.isDirectory) {
+                        // Check if any prettierrc file exists
+                        val hasPrettierRc = rootDir.listFiles()?.any { it.name.startsWith(".prettierrc") || it.name == "prettier.config.js" } ?: false
+                        
+                        if (!hasPrettierRc) {
+                            val newRcFile = File(rootDir, ".prettierrc")
+                            val content = """
+                                {
+                                  "printWidth": ${settings.customPrintWidth},
+                                  "tabWidth": ${settings.customTabWidth}
+                                }
+                            """.trimIndent()
+                            newRcFile.writeText(content)
+                            log.info("Prettier Java: Auto-created .prettierrc at ${newRcFile.absolutePath}")
+                        }
+                    }
+                } catch (e: Exception) {
+                    log.error("Prettier Java: Failed to auto-generate .prettierrc", e)
+                }
+            }
+            // -------------------------------------------- //
             
             val optionsJson = buildOptionsJson(settings, filePath)
             val prettierDir = extractPrettierResources()

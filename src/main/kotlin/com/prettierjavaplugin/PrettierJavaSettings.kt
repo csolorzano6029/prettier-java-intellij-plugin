@@ -15,6 +15,8 @@ class PrettierJavaSettings : PersistentStateComponent<PrettierJavaSettings.State
 
     data class State(
         var globalProfile: String = "Enterprise/Spring", // Profiles: "Enterprise/Spring", "Google Style", "Custom"
+        var customPrintWidth: Int = 110,
+        var customTabWidth: Int = 2,
         var enabled: Boolean = true,
         var formatOnSave: Boolean = false
     )

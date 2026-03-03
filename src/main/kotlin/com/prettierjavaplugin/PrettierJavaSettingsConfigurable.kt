@@ -1,6 +1,8 @@
 package com.prettierjavaplugin
 
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.project.ProjectManager
+import java.io.File
 import javax.swing.JComponent
 
 /**
@@ -27,6 +29,34 @@ class PrettierJavaSettingsConfigurable : Configurable {
     override fun apply() {
         val settings = PrettierJavaSettings.getInstance().state
         myPanel?.apply(settings)
+        
+        // Reactive update: update printWidth and tabWidth in existing .prettierrc files across open projects
+        if (settings.globalProfile == "Custom") {
+            try {
+                val openProjects = ProjectManager.getInstance().openProjects
+                for (project in openProjects) {
+                    val basePath = project.basePath ?: continue
+                    val rootDir = File(basePath)
+                    if (rootDir.exists() && rootDir.isDirectory) {
+                        val rcFile = File(rootDir, ".prettierrc")
+                        if (rcFile.exists() && rcFile.isFile) {
+                            var content = rcFile.readText()
+                            
+                            // Replace printWidth and tabWidth using regex
+                            val newPrintWidth = settings.customPrintWidth
+                            val newTabWidth = settings.customTabWidth
+                            
+                            content = content.replace(Regex("\"printWidth\"\\s*:\\s*\\d+"), "\"printWidth\": $newPrintWidth")
+                            content = content.replace(Regex("\"tabWidth\"\\s*:\\s*\\d+"), "\"tabWidth\": $newTabWidth")
+                            
+                            rcFile.writeText(content)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore silent update errors at Settings
+            }
+        }
     }
 
     override fun reset() {

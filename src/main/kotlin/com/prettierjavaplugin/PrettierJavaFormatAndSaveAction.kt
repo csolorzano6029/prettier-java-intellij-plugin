@@ -52,7 +52,7 @@ class PrettierJavaFormatAndSaveAction : AnAction("Save All") {
             // Background thread — does NOT block the EDT
             ApplicationManager.getApplication().executeOnPooledThread {
                 val formatted = try {
-                    PrettierJavaFormattingService.runPrettier(code, settings, filePath)
+                    PrettierJavaFormattingService.runPrettier(code, settings, filePath, project.basePath)
                 } catch (ex: Exception) {
                     log.warn("Prettier Java: Format on Save failed for '${file.name}'", ex)
                     null
