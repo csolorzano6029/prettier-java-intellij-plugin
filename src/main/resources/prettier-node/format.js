@@ -1,97 +1,69 @@
-#!/usr/bin/env node
-/**
- * format.js — Prettier Java runner for the IntelliJ plugin.
- *
- * Matches the behavior of RudraPatel's prettier-plugin-java-vscode:
- *   - Calls prettier.resolveConfig(filePath) to pick up .prettierrc from the project
- *   - IntelliJ user overrides (from Settings) take priority over .prettierrc values
- *
- * Protocol (avoids Windows CLI quoting issues):
- *   stdin line 1: JSON { filePath?, printWidth?, tabWidth?, ... }
- *   stdin rest:   Java source code to format
- *
- * Output: formatted Java to stdout | error to stderr (exit 1)
- */
-
 'use strict';
 
-const path   = require('path');
-const Module = require('module');
+const path = require('path');
+const fs = require('node:fs');
 
-// Require scoped to our extracted node_modules
-const nodeRequire = Module.createRequire(
-    path.join(__dirname, 'node_modules', 'prettier', 'package.json')
-);
+let prettierCache = null;
+let javaPluginCache = null;
 
-function readStdin() {
-    return new Promise((resolve, reject) => {
-        let data = '';
-        process.stdin.setEncoding('utf8');
-        process.stdin.on('data', chunk => { data += chunk; });
-        process.stdin.on('end', () => resolve(data));
-        process.stdin.on('error', reject);
-    });
+function loadPrettierModules() {
+    if (prettierCache && javaPluginCache) return { prettier: prettierCache, javaPlugin: javaPluginCache };
+
+    try {
+        const prettierPath = path.join(__dirname, 'node_modules', 'prettier', 'index.js');
+        // Plugin 1.x entry point is in dist/index.js
+        const pluginPath = path.join(__dirname, 'node_modules', 'prettier-plugin-java', 'dist', 'index.js');
+        
+        console.log('JS: Loading Prettier 2 (CJS) from ' + prettierPath);
+        prettierCache = require(prettierPath);
+        
+        console.log('JS: Loading Plugin (CJS) from ' + pluginPath);
+        javaPluginCache = require(pluginPath);
+
+        return { prettier: prettierCache, javaPlugin: javaPluginCache };
+    } catch (e) {
+        console.error('JS: loadPrettierModules error: ' + e.message);
+        throw new Error('Failed to load prettier modules: ' + e.message);
+    }
 }
 
-async function main() {
-    const input = await readStdin();
+/**
+ * Formats the given Java code (Prettier 2 / Plugin 1.x Version).
+ */
+async function formatCode(code, optionsJson) {
+    console.log('JS: [V5-FINAL] formatCode starting (Stable CJS path)');
+    const { prettier, javaPlugin } = loadPrettierModules();
 
-    const newlineIdx = input.indexOf('\n');
-    if (newlineIdx === -1) {
-        process.stderr.write('Invalid input: missing options line\n');
-        process.exit(1);
-    }
-
-    const optionsLine = input.substring(0, newlineIdx);
-    const code        = input.substring(newlineIdx + 1);
-
-    // Parse options sent from IntelliJ
     let intellijOptions = {};
-    try {
-        intellijOptions = JSON.parse(optionsLine);
-    } catch (e) {
-        process.stderr.write('Invalid options JSON: ' + e.message + '\n');
-        process.exit(1);
+    if (optionsJson) {
+        try {
+            intellijOptions = JSON.parse(optionsJson);
+        } catch (e) {
+            console.error('JS: Options parse error');
+            throw new Error('Invalid options JSON: ' + e.message);
+        }
     }
 
-    // Extract filePath from options (used for resolveConfig)
-    const { filePath, ...userOverrides } = intellijOptions;
+    const { filePath: optFilePath, ...userOverrides } = intellijOptions;
 
-    let prettier, javaPlugin;
-    try {
-        prettier = nodeRequire('prettier');
-        const _pluginModule = nodeRequire('prettier-plugin-java');
-        javaPlugin = _pluginModule.default ?? _pluginModule;
-    } catch (e) {
-        process.stderr.write('Failed to load prettier modules: ' + e.message + '\n');
-        process.exit(1);
-    }
+    console.log('JS: Resolving config...');
+    const resolvedConfig = optFilePath
+        ? (prettier.resolveConfig.sync(optFilePath, { editorconfig: true }) ?? {})
+        : {};
 
-    try {
-        // Resolve .prettierrc from the project — same as VS Code plugin does
-        // Falls back to null (Prettier defaults) if no config found
-        const resolvedConfig = filePath
-            ? (await prettier.resolveConfig(filePath, { editorconfig: true }) ?? {})
-            : {};
+    console.log('JS: Executing prettier.format (Sync)...');
+    // Prettier 2 and Java Plugin 1.x are synchronous
+    const formatted = prettier.format(code, {
+        ...userOverrides, // Fallbacks from IDE UI
+        ...resolvedConfig, // Priority overrides from .prettierrc
+        parser: 'java',
+        plugins: [javaPlugin],
+    });
+    console.log('JS: Formatting done, success: ' + !!formatted);
 
-        // Merge: Prettier defaults ← .prettierrc ← IntelliJ Settings overrides
-        const formatted = await prettier.format(code, {
-            ...resolvedConfig,
-            ...userOverrides,
-            parser:  'java',
-            plugins: [javaPlugin],
-        });
-
-        process.stdout.write(formatted);
-    } catch (e) {
-        process.stderr.write(e?.message ?? String(e));
-        process.stderr.write('\n');
-        process.exit(1);
-    }
+    return formatted;
 }
 
-main().catch(e => {
-    process.stderr.write(e?.message ?? String(e));
-    process.stderr.write('\n');
-    process.exit(1);
-});
+module.exports = {
+    formatCode
+};

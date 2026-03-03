@@ -1,15 +1,12 @@
 package com.prettierjavaplugin
 
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.JBTextField
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
-import javax.swing.JComboBox
 import javax.swing.JPanel
-import javax.swing.JSpinner
-import javax.swing.SpinnerNumberModel
 
 /**
  * Swing panel for the Prettier Java settings UI.
@@ -22,13 +19,7 @@ class PrettierJavaSettingsPanel {
     // Controls
     private val enabledCheckBox     = JBCheckBox("Enable Prettier Java formatter")
     private val formatOnSaveCheckBox = JBCheckBox("Format on Save (runs Prettier every time you save a .java file)")
-    private val nodePathField       = JBTextField()
-    private val printWidthSpinner   = JSpinner(SpinnerNumberModel(80, 1, 500, 1))
-    private val tabWidthSpinner     = JSpinner(SpinnerNumberModel(4, 1, 16, 1))
-    private val useTabsCheckBox     = JBCheckBox("Use Tabs instead of spaces")
-    private val semiCheckBox        = JBCheckBox("Add semicolons at end of statements")
-    private val singleQuoteCheckBox = JBCheckBox("Use single quotes")
-    private val trailingCommaCombo  = JComboBox(arrayOf("all", "es5", "none"))
+    private val profileCombo        = ComboBox(arrayOf("Enterprise/Spring", "Google Style", "Custom"))
 
     init {
         buildUI()
@@ -60,13 +51,18 @@ class PrettierJavaSettingsPanel {
 
         addFullRow(enabledCheckBox)
         addFullRow(formatOnSaveCheckBox)
-        addRow("Node.js executable path:", nodePathField)
-        addRow("Print Width:", printWidthSpinner)
-        addRow("Tab Width:", tabWidthSpinner)
-        addFullRow(useTabsCheckBox)
-        addFullRow(semiCheckBox)
-        addFullRow(singleQuoteCheckBox)
-        addRow("Trailing Comma:", trailingCommaCombo)
+        addRow("Formatting Profile:", profileCombo)
+        
+        // Note: explanation label
+        val explanationLabel = JBLabel("<html><small>" +
+                "<b>Enterprise/Spring:</b> printWidth=120, tabWidth=4, useTabs=true<br>" +
+                "<b>Google Style:</b> printWidth=100, tabWidth=2, useTabs=false<br>" +
+                "<b>Custom:</b> Relies on your local .prettierrc configuration" +
+                "</small></html>")
+        
+        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 2
+        panel.add(explanationLabel, gbc)
+        row++
 
         // Vertical spacer
         gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 2
@@ -78,37 +74,19 @@ class PrettierJavaSettingsPanel {
     fun apply(settings: PrettierJavaSettings.State) {
         settings.enabled       = enabledCheckBox.isSelected
         settings.formatOnSave  = formatOnSaveCheckBox.isSelected
-        settings.nodePath      = nodePathField.text.trim().ifBlank { "node" }
-        settings.printWidth    = printWidthSpinner.value as Int
-        settings.tabWidth      = tabWidthSpinner.value as Int
-        settings.useTabs       = useTabsCheckBox.isSelected
-        settings.semi          = semiCheckBox.isSelected
-        settings.singleQuote   = singleQuoteCheckBox.isSelected
-        settings.trailingComma = trailingCommaCombo.selectedItem as String
+        settings.globalProfile = profileCombo.selectedItem as String
     }
 
     /** Resets UI from settings state. */
     fun reset(settings: PrettierJavaSettings.State) {
         enabledCheckBox.isSelected      = settings.enabled
         formatOnSaveCheckBox.isSelected = settings.formatOnSave
-        nodePathField.text              = settings.nodePath
-        printWidthSpinner.value         = settings.printWidth
-        tabWidthSpinner.value           = settings.tabWidth
-        useTabsCheckBox.isSelected      = settings.useTabs
-        semiCheckBox.isSelected         = settings.semi
-        singleQuoteCheckBox.isSelected  = settings.singleQuote
-        trailingCommaCombo.selectedItem = settings.trailingComma
+        profileCombo.selectedItem       = settings.globalProfile
     }
 
     /** Returns true if UI values differ from the saved settings state. */
     fun isModified(settings: PrettierJavaSettings.State): Boolean =
         enabledCheckBox.isSelected      != settings.enabled ||
         formatOnSaveCheckBox.isSelected != settings.formatOnSave ||
-        nodePathField.text.trim()       != settings.nodePath ||
-        printWidthSpinner.value as Int  != settings.printWidth ||
-        tabWidthSpinner.value as Int    != settings.tabWidth ||
-        useTabsCheckBox.isSelected      != settings.useTabs ||
-        semiCheckBox.isSelected         != settings.semi ||
-        singleQuoteCheckBox.isSelected  != settings.singleQuote ||
-        trailingCommaCombo.selectedItem as String != settings.trailingComma
+        profileCombo.selectedItem as String != settings.globalProfile
 }

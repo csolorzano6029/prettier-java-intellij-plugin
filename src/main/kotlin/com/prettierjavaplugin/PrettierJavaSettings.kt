@@ -14,13 +14,7 @@ import com.intellij.openapi.components.service
 class PrettierJavaSettings : PersistentStateComponent<PrettierJavaSettings.State> {
 
     data class State(
-        var nodePath: String = "node",
-        var printWidth: Int = 80,
-        var tabWidth: Int = 2,
-        var useTabs: Boolean = false,
-        var trailingComma: String = "all",
-        var semi: Boolean = true,
-        var singleQuote: Boolean = false,
+        var globalProfile: String = "Enterprise/Spring", // Profiles: "Enterprise/Spring", "Google Style", "Custom"
         var enabled: Boolean = true,
         var formatOnSave: Boolean = false
     )
