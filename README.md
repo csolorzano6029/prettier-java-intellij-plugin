@@ -29,7 +29,7 @@ Plugin de IntelliJ IDEA que formatea archivos Java usando **Prettier** con `pret
 1. Descarga o compila el archivo `.zip` (ver sección Build)
 2. Abre IntelliJ IDEA
 3. Ve a **Settings → Plugins → ⚙️ → Install Plugin from Disk...**
-4. Selecciona el archivo `prettier-java-1.0.1.zip`
+4. Selecciona el archivo `prettier-java-1.0.2.zip`
 5. Reinicia IntelliJ cuando lo solicite
 
 ---
@@ -50,7 +50,8 @@ El plugin incorpora perfiles preconfigurados para inyectar automáticamente conf
 2. **Google Style**
    - _Reglas:_ `printWidth: 100`, `tabWidth: 2`, `useTabs: false`, `semi: true`, `singleQuote: false`.
 3. **Custom**
-   - _Reglas:_ El plugin no inyecta ninguna regla estricta. Todo recae **única y exclusivamente** en lo que esté configurado en tu archivo `.prettierrc`.
+   - _Reglas:_ El plugin no inyecta ninguna regla estricta interna, sino que permite configurar dinámicamente **Custom Print Width** y **Custom Tab Width** desde este mismo panel.
+   - ⚡ **Auto-generación Reactiva:** Si seleccionas "Custom", cambias los números numéricos y das clic en _Aplicar_, el plugin escaneará instantáneamente la raíz de tu proyecto. Si el archivo `.prettierrc` no existe, lo creará automáticamente. Si ya existe, sobreescribirá en tiempo real sus claves `printWidth` y `tabWidth` con tus nuevos valores elegidos.
 
 ### `.prettierrc` en el proyecto
 
@@ -110,7 +111,7 @@ cd C:\ruta\al\proyecto\FORMATER_V2
 El archivo `.zip` se genera en:
 
 ```
-build\distributions\prettier-java-1.0.1.zip
+build\distributions\prettier-java-1.0.2.zip
 ```
 
 ### Actualizar versión de Prettier
