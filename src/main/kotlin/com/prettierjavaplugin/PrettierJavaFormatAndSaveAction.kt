@@ -19,7 +19,7 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
  * When format on save is disabled or the file is not Java:
  *   → Saves all documents normally (same as built-in Ctrl+S)
  */
-class PrettierJavaFormatAndSaveAction : AnAction() {
+class PrettierJavaFormatAndSaveAction : AnAction("Save All") {
 
     private val log = thisLogger()
 

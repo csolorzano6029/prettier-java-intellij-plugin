@@ -182,7 +182,19 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
 
         private fun buildOptionsJson(settings: PrettierJavaSettings.State, filePath: String = ""): String {
             val escapedPath = filePath.replace("\\", "/")
-            return """{"filePath":"$escapedPath","printWidth":${settings.printWidth},"tabWidth":${settings.tabWidth},"useTabs":${settings.useTabs},"trailingComma":"${settings.trailingComma}","semi":${settings.semi},"singleQuote":${settings.singleQuote}}"""
+            
+            return when (settings.globalProfile) {
+                "Enterprise/Spring" -> {
+                    """{"filePath":"$escapedPath","printWidth":120,"tabWidth":4,"useTabs":true,"trailingComma":"none","semi":true,"singleQuote":false}"""
+                }
+                "Google Style" -> {
+                    """{"filePath":"$escapedPath","printWidth":100,"tabWidth":2,"useTabs":false,"trailingComma":"none","semi":true,"singleQuote":false}"""
+                }
+                else -> {
+                    // "Custom" or unknown profile -> rely on .prettierrc in the project
+                    """{"filePath":"$escapedPath"}"""
+                }
+            }
         }
 
         @Synchronized

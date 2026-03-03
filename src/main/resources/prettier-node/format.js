@@ -54,8 +54,8 @@ async function formatCode(code, optionsJson) {
     console.log('JS: Executing prettier.format (Sync)...');
     // Prettier 2 and Java Plugin 1.x are synchronous
     const formatted = prettier.format(code, {
-        ...resolvedConfig,
-        ...userOverrides,
+        ...userOverrides, // Fallbacks from IDE UI
+        ...resolvedConfig, // Priority overrides from .prettierrc
         parser: 'java',
         plugins: [javaPlugin],
     });

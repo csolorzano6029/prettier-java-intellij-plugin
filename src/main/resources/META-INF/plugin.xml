@@ -2,16 +2,16 @@
     <id>com.prettierjavaplugin</id>
     <name>Prettier Java</name>
     <version>1.0.0</version>
-    <vendor>Prettier Java Plugin</vendor>
+    <vendor>Carlos Solórzano</vendor>
 
     <description><![CDATA[
         Format Java files using <b>Prettier</b> with <code>prettier-plugin-java</code>.<br><br>
         <ul>
-            <li>Integrates with <b>Ctrl+Alt+L</b> (Reformat Code)</li>
-            <li><b>Format on Save</b> via Ctrl+S (enable in Settings → Tools → Prettier Java)</li>
-            <li>All Prettier options configurable in <b>Settings → Tools → Prettier Java</b></li>
+            <li><b>Zero-latency:</b> Uses an embedded V8 engine (Javet). No external Node.js required.</li>
+            <li><b>Ctrl+Alt+L:</b> Replaces or complements the built-in formatter.</li>
+            <li><b>Format on Save:</b> Automatically formats your code when you save (Ctrl+S).</li>
+            <li><b>Highly Configurable:</b> Tab width, print width, semicolons, and more in settings.</li>
         </ul>
-        <br>Requires <b>Node.js</b> installed on the system (configurable path).
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
@@ -43,6 +43,10 @@
         -->
         <action id="SaveAll"
                 class="com.prettierjavaplugin.PrettierJavaFormatAndSaveAction"
-                overrides="true"/>
+                text="Save All"
+                description="Save all documents, formatting Java files if enabled"
+                overrides="true">
+            <add-to-group group-id="FileMenu" anchor="after" relative-to-action="SaveDocument"/>
+        </action>
     </actions>
 </idea-plugin>
