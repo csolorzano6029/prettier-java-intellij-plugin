@@ -1,7 +1,6 @@
 'use strict';
 
-const path = require('path');
-const fs = require('node:fs');
+const path = require('node:path');
 
 let prettierCache = null;
 let javaPluginCache = null;
