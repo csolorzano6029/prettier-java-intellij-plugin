@@ -20,6 +20,9 @@ dependencies {
         intellijIdeaCommunity(providers.gradleProperty("platformVersion").get())
         bundledPlugin("com.intellij.java")
     }
+    // javet:3.1.3 es un fat-JAR en v3.x: incluye binarios nativos Node.js para
+    // Windows x86_64, macOS x86_64, macOS ARM64 y Linux x86_64 dentro del mismo artefacto.
+    // Los artefactos modulares separados por OS (javet-node-*) solo existen desde v4+.
     implementation("com.caoccao.javet:javet:3.1.3")
 }
 
@@ -32,7 +35,12 @@ val npmInstall by tasks.registering(Exec::class) {
     group = "build"
     description = "Installs NPM dependencies for the Prettier runner"
     workingDir = prettierNodeDir
-    commandLine = listOf("cmd", "/c", "npm", "install", "--omit=dev", "--legacy-peer-deps")
+    val isWindows = System.getProperty("os.name").lowercase().contains("win")
+    commandLine = if (isWindows) {
+        listOf("cmd", "/c", "npm", "install", "--omit=dev", "--legacy-peer-deps")
+    } else {
+        listOf("npm", "install", "--omit=dev", "--legacy-peer-deps")
+    }
     inputs.file(File(prettierNodeDir, "package.json"))
     outputs.dir(File(prettierNodeDir, "node_modules"))
 }

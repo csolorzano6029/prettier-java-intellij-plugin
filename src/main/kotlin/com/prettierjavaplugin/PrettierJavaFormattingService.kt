@@ -104,7 +104,6 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
 
         private fun runPrettierInternal(code: String, settings: PrettierJavaSettings.State, filePath: String, projectBasePath: String?): String? {
             log.info("Prettier Java: Starting runPrettierInternal on ${Thread.currentThread().name}")
-            System.err.println("Prettier Java [NATIVE TRACE]: Starting runPrettierInternal")
             
             // --- Custom Profile Auto-Generation Logic --- //
             if (settings.globalProfile == "Custom" && projectBasePath != null) {
@@ -137,16 +136,14 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
             val formatScript = File(prettierDir, "format.js").absolutePath.replace("\\", "/")
 
             log.info("Prettier Java: Creating V8 Runtime (Node mode)...")
-            System.err.println("Prettier Java [NATIVE TRACE]: Creating V8 Runtime")
-            
+
             // Basic runtime creation
             val runtime: com.caoccao.javet.interop.V8Runtime = V8Host.getNodeInstance().createV8Runtime()
             var result: String? = null
             
             try {
                 log.info("Prettier Java: Initializing format.js...")
-                System.err.println("Prettier Java [NATIVE TRACE]: Initializing format.js")
-                
+
                 val initScript = """
                     const formatModule = require('$formatScript');
                     globalThis.formatCode = formatModule.formatCode;
@@ -155,7 +152,6 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
                 runtime.getExecutor(initScript).executeVoid()
 
                 log.info("Prettier Java: Calling formatCode JS function...")
-                System.err.println("Prettier Java [NATIVE TRACE]: Calling formatCode")
                 val globalObj = runtime.getGlobalObject()
                 
                 // Get the function as a V8Value and cast it
@@ -165,10 +161,8 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
                     val promise = formatFn.call<com.caoccao.javet.values.reference.V8ValuePromise>(null, code as Any, optionsJson as Any)
                     try {
                         log.info("Prettier Java: Awaiting JS Promise...")
-                        System.err.println("Prettier Java [NATIVE TRACE]: Awaiting JS Promise")
                         runtime.await() // Process Node.js Event Loop
-                        
-                        System.err.println("Prettier Java [NATIVE TRACE]: Promise resolved")
+
                         if (promise.isRejected) {
                             val errorValue = promise.getResult<com.caoccao.javet.values.V8Value>()
                             val error = errorValue.toString()
@@ -193,11 +187,8 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
                 }
             } catch (t: Throwable) {
                 log.error("Prettier Java: V8 Internal Error", t)
-                System.err.println("Prettier Java [NATIVE TRACE]: ERROR: ${t.message}")
-                t.printStackTrace()
             } finally {
                 log.info("Prettier Java: Closing V8 Runtime...")
-                System.err.println("Prettier Java [NATIVE TRACE]: Closing V8 Runtime")
                 try {
                     runtime.close()
                     log.info("Prettier Java: Runtime closed successfully.")
@@ -271,13 +262,11 @@ class PrettierJavaFormattingService : AsyncDocumentFormattingService() {
 
             val prettierIndex = File(nodeModulesDir, "prettier/index.js")
             val prettierExists = prettierIndex.exists()
-            
-            val msg = "Prettier Java [NATIVE TRACE]: [V5] Resources extracted. Total files: $extractedCount. Prettier index exists: $prettierExists"
-            log.info(msg)
-            System.err.println(msg)
-            
+
+            log.info("Prettier Java: Resources extracted. Total files: $extractedCount. Prettier index exists: $prettierExists")
+
             if (!prettierExists) {
-                System.err.println("Prettier Java [NATIVE TRACE]: CRITICAL - prettier index NOT FOUND at ${prettierIndex.absolutePath}")
+                log.error("Prettier Java: CRITICAL - prettier index NOT FOUND at ${prettierIndex.absolutePath}")
             }
 
             log.info("Prettier Java: Resources extracted to ${dir.absolutePath}")

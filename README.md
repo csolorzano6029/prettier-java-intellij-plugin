@@ -2,6 +2,10 @@
 
 Plugin de IntelliJ IDEA que formatea archivos Java usando **Prettier** con `prettier-plugin-java`, replicando el comportamiento del [Prettier Java Plugin de VS Code (RudraPatel)](https://marketplace.visualstudio.com/items?itemName=RudraPatel.prettier-plugin-java).
 
+![Windows](https://img.shields.io/badge/Windows-0078D4?logo=windows&logoColor=white)
+![macOS](https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)
+
 ---
 
 ## ✨ Características
@@ -11,6 +15,7 @@ Plugin de IntelliJ IDEA que formatea archivos Java usando **Prettier** con `pret
 - **Detección automática de `.prettierrc`** — Si tienes un archivo de configuración en tu proyecto, el plugin lo usa automáticamente
 - **Panel de configuración** en Settings → Tools → Prettier Java
 - **Zero-latency (Javet)** — No requiere instalar Node.js, `prettier` ni `prettier-plugin-java` globalmente. Todo viene integrado mediante un motor V8 embebido.
+- **Multiplataforma** — Compatible con Windows, macOS (Intel y Apple Silicon) y Linux.
 
 ---
 
@@ -20,7 +25,16 @@ Plugin de IntelliJ IDEA que formatea archivos Java usando **Prettier** con `pret
 | ------------------------------------ | -------------- |
 | IntelliJ IDEA (Community o Ultimate) | 2024.1+        |
 
-> ⚠️ **No se necesita Node.js**. El plugin utiliza la librería Javet (V8 engine) incrustada en el IDE para inyectar y ejecutar Prettier de forma nativa.
+### 💻 Sistemas Operativos Compatibles
+
+| OS      | Arquitectura          | Estado       |
+| ------- | --------------------- | ------------ |
+| Windows | x86_64                | ✅ Soportado |
+| macOS   | x86_64 (Intel)        | ✅ Soportado |
+| macOS   | ARM64 (Apple Silicon) | ✅ Soportado |
+| Linux   | x86_64                | ✅ Soportado |
+
+> ⚠️ **No se necesita Node.js en tiempo de ejecución**. El plugin utiliza la librería Javet (V8 engine) incrustada en el IDE para inyectar y ejecutar Prettier de forma nativa. Los binarios nativos para cada plataforma están incluidos dentro del plugin.
 
 ---
 
@@ -29,7 +43,7 @@ Plugin de IntelliJ IDEA que formatea archivos Java usando **Prettier** con `pret
 1. Descarga o compila el archivo `.zip` (ver sección Build)
 2. Abre IntelliJ IDEA
 3. Ve a **Settings → Plugins → ⚙️ → Install Plugin from Disk...**
-4. Selecciona el archivo `prettier-java-1.0.2.zip`
+4. Selecciona el archivo `prettier-java-1.0.3.zip`
 5. Reinicia IntelliJ cuando lo solicite
 
 ---
@@ -98,7 +112,7 @@ Ejemplo recomendado de `.prettierrc`:
 - JDK 17+ instalado
 - Node.js con npm disponible en PATH
 
-### Pasos
+### Pasos en Windows
 
 ```powershell
 # 1. Ve al directorio del proyecto
@@ -108,10 +122,23 @@ cd C:\ruta\al\proyecto\FORMATER_V2
 .\gradlew.bat buildPlugin
 ```
 
+### Pasos en macOS / Linux
+
+```bash
+# 1. Ve al directorio del proyecto
+cd /ruta/al/proyecto/FORMATER_V2
+
+# 2. Dar permisos de ejecución al wrapper (solo la primera vez)
+chmod +x gradlew
+
+# 3. Compila el plugin
+./gradlew buildPlugin
+```
+
 El archivo `.zip` se genera en:
 
 ```
-build\distributions\prettier-java-1.0.2.zip
+build/distributions/prettier-java-1.0.3.zip
 ```
 
 ### Actualizar versión de Prettier
